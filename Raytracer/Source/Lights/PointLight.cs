@@ -2,7 +2,7 @@
 
 namespace Raytracer.Source.Lights
 {
-    class PointLight
+    public class PointLight
     {
         public PointLight(Vector3 position, Vector3 direction, Vector3 intensity)
         {

@@ -15,6 +15,8 @@ namespace Raytracer.Raytracer
             float halfWidth = aspect * halfHeight;
 
             Origin = lookFrom;
+            Vfov = theta;
+            Aspect = aspect;
             Vector3 w = Vector3.Normalize(lookFrom - lookAt);
             Vector3 u = Vector3.Normalize(Vector3.Cross(vup, w));
             Vector3 v = Vector3.Cross(w, u);
@@ -29,6 +31,8 @@ namespace Raytracer.Raytracer
         public Vector3 Vertical { get;  }
         public Vector3 Horizontal { get; }
         public Vector3 Origin { get; }
+        public float Vfov { get; }
+        public float Aspect { get; }
         public Vector3 LowerLeft { get; }
 
         public CustomRay GetRay(float u, float v)

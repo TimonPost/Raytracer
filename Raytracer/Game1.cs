@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -8,8 +9,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Raytracer.Raytracer;
+using Raytracer.Source.Lights;
 using Raytracer.Source.Shapes;
-using Plane = Raytracer.Source.Shapes.Plane;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 using Vector3 = Microsoft.Xna.Framework.Vector3;
 
@@ -28,6 +29,7 @@ namespace Raytracer
         private RayTracer _rayTracer;
 
         bool _needsDraw = false;
+        private Camera _camera;
 
         public Game1()
         {
@@ -49,61 +51,77 @@ namespace Raytracer
             // Create the canvas texture.
             _canvas = new Texture2D(_graphics.GraphicsDevice, (int) Width, (int) Height);
            
-            Vector3 lookFrom = new Vector3(0f, 2f, 4f);
-            Vector3 lookAt = new Vector3(2f, 1.0f, 0f);
+            Vector3 lookFrom = new Vector3(5f, 8f, 10f);
+            Vector3 lookAt = new Vector3(5f, 0f, 0f);
             float aspectRatio = Width / Height;
             float fov =70f;
 
-            var camera = new Camera(lookFrom, lookAt, new Vector3(0f,1f,0f), fov, aspectRatio);
-            _rayTracer = new RayTracer(camera, Width, Height, 16);
+            //var camera = new Camera(lookFrom, lookAt, new Vector3(0f, 1f, 0f), fov, aspectRatio);
+            _camera = new Camera(lookFrom, lookAt, new Vector3(0f,1f,0f), fov, aspectRatio);
+            _rayTracer = new RayTracer(_camera, Width, Height, 6);
 
-            _world = TestScene();
+            _world = CubeScene();
 
             base.Initialize();
+        }
+        
+        private World CubeScene()
+        {
+            var spheres = new List<IRaytracable>();
+
+            for (int y = 0; y < 5; y++)
+            {
+                for (int x = 0; x < 5; x++)
+                {
+                    for (int z = 0; z < 5; z++)
+                    {
+                        var position = new Vector3(x, y, -z);
+
+                        var material = new Lambertian(new Vector3(1.0f, 0.0f, 0.0f));
+                        var sphere = new Sphere(position, 0.5f, material);
+                        spheres.Add(sphere);
+                    }
+                }
+            }
+
+            return new World(spheres, new List<PointLight>());
         }
 
         private World TestScene()
         {
-             var entities = new List<Sphere>();
-             entities.Add(new Sphere(new Vector3(0f, -100, 0f), 100f, new CheckerBoard(10f))); //new Vector3(0.5f, 0.5f, 0.5f))));
             // entities.Add(
             //     new Sphere(new Vector3(0f, 1f, 0f), 1.0f, new Dielectric(1.5f)));
             // entities.Add(
             //     new Sphere(new Vector3(-4f, 1f, 0f), 1.0f, new Lambertian(new Vector3(1.0f, 0.0f, 0.0f))));
               // entities.Add(
               //     new Sphere(new Vector3(4f, 1f, 1f), 1.0f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)));
-              entities.Add(
-                  new Sphere(new Vector3(3f, 1f, 0f), 1.0f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)));
-              entities.Add(
-                  new Sphere(new Vector3(2f, 1f, 2f), 0.5f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)));
 
-            var sphereList = new SphereList();
-            sphereList.Spheres = entities;
             
-            return new World
-            {
-                Spheres = sphereList,
-                Cubes = new List<AabBox>()
-                {
-                     // new AABBox(new Vector3(-0f, 0.5f,2f), new Vector3(1f, 1.5f, 3f), new Dielectric(0.5f)),
-                     // new AABBox(new Vector3(-4f, 0.5f,2f), new Vector3(-3f, 1.5f, 3f),  new Lambertian(new Vector3(1f, 0f, 0f))),
-                     //new AabBox(new Vector3(1.5f, 0.5f,1f), new Vector3(2f, 1.5f, 2f), new Dielectric(1.5f)),
-                },
-                Planes = new List<Plane>()
-                {
+            return new World(
+                new List<IRaytracable>() {
+                   
+                    new Sphere(new Vector3(3f, 1f, 0f), 1.0f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)),
+                    new Sphere(new Vector3(2f, 1f, 2f), 0.5f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)),
+                    new Sphere(new Vector3(1f, 3f, 0f), 0.5f, new Lambertian(new Vector3(1.0f, 0.0f, 0.0f))),
+
                     //new Plane(new Vector3(0, -2, 0), -Vector3.Up)
+                    // new AABBox(new Vector3(-0f, 0.5f,2f), new Vector3(1f, 1.5f, 3f), new Dielectric(0.5f)),
+                    // new AABBox(new Vector3(-4f, 0.5f,2f), new Vector3(-3f, 1.5f, 3f),  new Lambertian(new Vector3(1f, 0f, 0f))),
+                    //new AabBox(new Vector3(1.5f, 0.5f,1f), new Vector3(2f, 1.5f, 2f), new Dielectric(1.5f)),
+                    // new Triangle(
+                    //     new Vector3(-2f,0f,0f),
+                    //     new Vector3(-2f,0f,-2f),
+                    //     new Vector3(0f,0f,-2f),
+                    //     new Vector3(-1f,0f,0f),
+                    //     new Vector3(1f,2f,-1f)
+                    //     , new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)), //new Lambertian(new Vector3(0.9f, 0.7f, 0.2f)))
+                    
+
                 },
-                Triangle = new List<Triangle>()
+                new List<PointLight>()
                 {
-                    new Triangle(
-                        new Vector3(-2f,0f,0f),
-                        new Vector3(-2f,0f,-2f),
-                        new Vector3(0f,0f,-2f),
-                        new Vector3(-1f,0f,0f),
-                        new Vector3(1f,2f,-1f)
-                    ,new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f))//new Lambertian(new Vector3(0.9f, 0.7f, 0.2f)))
-                }
-            };
+                    new PointLight(new Vector3(3f, 3f, 0f), new Vector3(0f, -1f, 0f), new Vector3(1f, 1f, 1f))
+                });
         }
 
         private World SphereScene()
@@ -153,14 +171,8 @@ namespace Raytracer
                  new Sphere(new Vector3(-4f, 1f, 0f), 1.0f, new Lambertian(new Vector3(0.4f, 0.2f, 0.1f))));
              entities.Add(
                  new Sphere(new Vector3(4f, 1f, 0f), 1.0f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)));
-            
-            var sphereList = new SphereList();
-            sphereList.Spheres = entities;
 
-            return new World
-            {
-                Spheres = sphereList
-            };
+             return new World(entities.Cast<IRaytracable>().ToList(), new List<PointLight>());
         }
 
         protected override void LoadContent()
@@ -185,8 +197,6 @@ namespace Raytracer
             base.Update(gameTime);
         }
 
-        
-
         protected override void Draw(GameTime gameTime)
         {
             if (_needsDraw)
@@ -195,10 +205,14 @@ namespace Raytracer
             }
 
             GraphicsDevice.Clear(Color.CornflowerBlue);
+            GraphicsDevice.RasterizerState = RasterizerState.CullNone;
 
             // TODO: Add your drawing code here
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
             this.Render();
+            var cube = new Cube(Color.Red, GraphicsDevice, _camera);
+            cube.Render();
+
             _spriteBatch.End();
 
             base.Draw(gameTime);

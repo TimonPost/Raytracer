@@ -25,7 +25,7 @@ namespace Raytracer
         public int Height { get; }
        
         public int PixelSampleCount = 120;
-        public int RayDepth = 200;
+        public int RayDepth = 2;
         public float MinIntersection = 0.001f;
         public float MaxIntersection = 1000;
         private List<Task> _tasks = new List<Task>();
@@ -112,7 +112,7 @@ namespace Raytracer
             switch (quality)
             {
                 case RenderQuality.Low:
-                    return 100;
+                    return 40;
                 case RenderQuality.Medium:
                     return 50;
                 case RenderQuality.High:
@@ -164,22 +164,42 @@ namespace Raytracer
         {
             var record = new HitRecord();
 
+
             if (world.Intersects(ray, MinIntersection, MaxIntersection, ref record))
             {
                 CustomRay scattered = new CustomRay(Vector3.Zero, Vector3.Zero);
                 Vector3 attenuation = Vector3.One;
-
+                
                 if (depth < RayDepth && record.Material.Scatter(ray, record, ref attenuation, ref scattered))
-                    return attenuation * Trace(world, scattered, depth + 1);
+                {
+                    var att = attenuation * Trace(world, scattered, depth + 1);
+
+                    // if (!world.HitsLight(ray, record.P))
+                    // {
+                    //     att *= 0.2f;
+                    // } 
+                    
+                    return att;
+                }
+                else
+                {
+                    return new Vector3(0.0f, 0.0f, 0.0f);
+                }
+
 
                 return attenuation;
             }
+
+            
+
 
             var direction = Vector3.Normalize(ray.Direction());
             var t = 0.5f * (direction.Y + 1.0f);
             var blend = (1.0f - t) * new Vector3(1f, 1f, 1f) + t * new Vector3(0.5f, 0.7f, 1f);
             return blend;
         }
+
+
     }
     
 

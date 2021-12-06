@@ -16,6 +16,13 @@ namespace Raytracer.Source.Shapes
             Material = material;
         }
 
+        public Vector3 LeftFrontBottomCorner => Center - new Vector3(Radius);
+        public Vector3 RightBackTopCorner => LeftFrontBottomCorner + (Center + new Vector3(Radius));
+        public Vector3 Dimensions => RightBackTopCorner - LeftFrontBottomCorner;
+
+        public CubeBound Bounds => new CubeBound((int)LeftFrontBottomCorner.X, (int)LeftFrontBottomCorner.Y, (int)LeftFrontBottomCorner.Z, (int)Dimensions.X, (int)Dimensions.Y, (int)Dimensions.Z);
+
+
         public bool Intersects(CustomRay ray, float tmin, float tmax, ref HitRecord record) 
         {
             Vector3 oc = ray.Origin() - Center;
@@ -33,6 +40,7 @@ namespace Raytracer.Source.Shapes
                     record.T = t1;
                     record.P = ray.PointAt(record.T);
                     record.Normal = (record.P - Center) / Radius;
+                    record.Material = Material;
                     return true;
                 }
 
@@ -43,6 +51,7 @@ namespace Raytracer.Source.Shapes
                     record.T = t2;
                     record.P = ray.PointAt(record.T);
                     record.Normal = (record.P - Center) / Radius;
+                    record.Material = Material;
                     return true;
                 }
             }
