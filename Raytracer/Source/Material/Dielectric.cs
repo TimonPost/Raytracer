@@ -13,11 +13,11 @@ namespace Raytracer
             _ref_idx = refIdx;
         }
 
-        public bool Scatter(CustomRay ray_in, HitRecord record, ref Vector3 attenuation,
-            ref CustomRay scattered)
+        public bool Scatter(Ray ray_in, HitRecord record, ref Vector3 attenuation,
+            ref Ray scattered)
         {
             Vector3 outwardNormal;
-            Vector3 reflected = ((IMaterial)(this)).Reflect(ray_in.Direction(), record.Normal);
+            Vector3 reflected = ((IMaterial)(this)).Reflect(ray_in.Direction, record.Normal);
             float niOverNt;
 
             attenuation = new Vector3(1f, 1f, 1f);
@@ -25,20 +25,20 @@ namespace Raytracer
             float reflectProb;
             float cosine;
 
-            if (Vector3.Dot(ray_in.Direction(), record.Normal) > 0)
+            if (Vector3.Dot(ray_in.Direction, record.Normal) > 0)
             {
                 outwardNormal = -record.Normal;
                 niOverNt = _ref_idx;
-                cosine = _ref_idx * Vector3.Dot(ray_in.Direction(), record.Normal) / ray_in.Direction().Length();
+                cosine = _ref_idx * Vector3.Dot(ray_in.Direction, record.Normal) / ray_in.Direction.Length();
             }
             else
             {
                 outwardNormal = record.Normal;
                 niOverNt = 1f / _ref_idx;
-                cosine = -Vector3.Dot(ray_in.Direction(), record.Normal) / ray_in.Direction().Length();
+                cosine = -Vector3.Dot(ray_in.Direction, record.Normal) / ray_in.Direction.Length();
             }
 
-            if (((IMaterial)(this)).Refract(ray_in.Direction(), outwardNormal, niOverNt, ref refracted))
+            if (((IMaterial)(this)).Refract(ray_in.Direction, outwardNormal, niOverNt, ref refracted))
             {
                 reflectProb = ((IMaterial)(this)).Schlick(cosine, _ref_idx);
             }
@@ -50,11 +50,11 @@ namespace Raytracer
             var rand = new Random();
             if (rand.NextDouble() < reflectProb)
             {
-                scattered = new CustomRay(record.P, reflected);
+                scattered = new Ray(record.P, reflected);
             }
             else
             {
-                scattered = new CustomRay(record.P, refracted);
+                scattered = new Ray(record.P, refracted);
             }
 
             return true;

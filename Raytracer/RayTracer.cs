@@ -25,7 +25,7 @@ namespace Raytracer
         public int Height { get; }
        
         public int PixelSampleCount = 120;
-        public int RayDepth = 2;
+        public int RayDepth = 5;
         public float MinIntersection = 0.001f;
         public float MaxIntersection = 1000;
         private List<Task> _tasks = new List<Task>();
@@ -112,7 +112,7 @@ namespace Raytracer
             switch (quality)
             {
                 case RenderQuality.Low:
-                    return 40;
+                    return 100;
                 case RenderQuality.Medium:
                     return 50;
                 case RenderQuality.High:
@@ -151,23 +151,21 @@ namespace Raytracer
 
                     color /= PixelSampleCount;
                     color = new Vector3(MathF.Sqrt(color.X), MathF.Sqrt(color.Y), MathF.Sqrt(color.Z));
-
-                    lock (lockJob)
-                    {
-                        FrameBuffer.SetPixel((int)c, (int)r, new Color(color));
-                    }
+                    
+                     FrameBuffer.SetPixel((int)c, (int)r, new Color(color));
+                    
                 }
             }
         }
 
-        private Vector3 Trace(World world, CustomRay ray, int depth)
+        private Vector3 Trace(World world, Ray ray, int depth)
         {
             var record = new HitRecord();
 
 
             if (world.Intersects(ray, MinIntersection, MaxIntersection, ref record))
             {
-                CustomRay scattered = new CustomRay(Vector3.Zero, Vector3.Zero);
+                Ray scattered = new Ray(Vector3.Zero, Vector3.Zero);
                 Vector3 attenuation = Vector3.One;
                 
                 if (depth < RayDepth && record.Material.Scatter(ray, record, ref attenuation, ref scattered))
@@ -191,9 +189,7 @@ namespace Raytracer
             }
 
             
-
-
-            var direction = Vector3.Normalize(ray.Direction());
+            var direction = Vector3.Normalize(ray.Direction);
             var t = 0.5f * (direction.Y + 1.0f);
             var blend = (1.0f - t) * new Vector3(1f, 1f, 1f) + t * new Vector3(0.5f, 0.7f, 1f);
             return blend;

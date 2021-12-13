@@ -40,25 +40,20 @@ namespace Raytracer
 
         protected override void Initialize()
         {
-            // TODO: Add your initialization logic here
             _graphics.PreferredBackBufferWidth = (int) Width;
             _graphics.PreferredBackBufferHeight = (int) Height;
             _graphics.IsFullScreen = false;
             _graphics.ApplyChanges();
-
-            // Create the canvas pixel array.
-       
-            // Create the canvas texture.
+            
             _canvas = new Texture2D(_graphics.GraphicsDevice, (int) Width, (int) Height);
            
-            Vector3 lookFrom = new Vector3(5f, 8f, 10f);
-            Vector3 lookAt = new Vector3(5f, 0f, 0f);
+            Vector3 lookFrom = new Vector3(15f, 15f, 35f);
+            Vector3 lookAt = new Vector3(15f, 15f,15f);
             float aspectRatio = Width / Height;
-            float fov =70f;
-
-            //var camera = new Camera(lookFrom, lookAt, new Vector3(0f, 1f, 0f), fov, aspectRatio);
+            float fov =90f;
+            
             _camera = new Camera(lookFrom, lookAt, new Vector3(0f,1f,0f), fov, aspectRatio);
-            _rayTracer = new RayTracer(_camera, Width, Height, 6);
+            _rayTracer = new RayTracer(_camera, Width, Height, 16);
 
             _world = CubeScene();
 
@@ -67,24 +62,70 @@ namespace Raytracer
         
         private World CubeScene()
         {
-            var spheres = new List<IRaytracable>();
+            var entities = new List<IRaytracable>();
+            entities.Add(new Sphere(new Vector3(0f, -1000, 0f), 1000f, new Lambertian(new Vector3(212/255f, 135/255f, 205/255f))));
+            var rand = new Random();
 
-            for (int y = 0; y < 5; y++)
+            int count = 30;
+            int zoffset = 0;
+            int yoffsetr = 0;
+            float size = 1.5f;
+
+            for (int y = 0 + yoffsetr; y < count + yoffsetr; y += 3)
             {
-                for (int x = 0; x < 5; x++)
+                for (int x = 0; x < count; x += 3)
                 {
-                    for (int z = 0; z < 5; z++)
+                    for (int z = 0 + zoffset; z < count + zoffset; z += 3)
                     {
-                        var position = new Vector3(x, y, -z);
+                        var position = new Vector3(x, y, z);
 
-                        var material = new Lambertian(new Vector3(1.0f, 0.0f, 0.0f));
-                        var sphere = new Sphere(position, 0.5f, material);
-                        spheres.Add(sphere);
+                        IMaterial material;
+
+
+                        var rngMaterial = rand.NextDouble();
+                        if (rngMaterial > 0.0 && rngMaterial < 0.33)
+                        {
+                            material = new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0.0f);
+                        }
+                        else if (rngMaterial >= 0.33 && rngMaterial < 0.66)
+                        {
+                            material = new Dielectric(1.5f);
+                        }
+                        else
+                        {
+                            material = new Lambertian(new Vector3(1.0f, 0.0f, 0.0f));
+                        }
+                        
+                        IRaytracable shape ;
+
+                        var rnum =rand.NextDouble();
+                        if (rnum > 0.0 && rnum < 0.33)
+                        {
+                            var min = new Vector3(x, y, z);
+                            shape = new AabBox(min, min + new Vector3(size), material);
+                        }
+                        else if (rnum >= 0.33 && rnum < 0.66)
+                        {
+                            var a = new Vector3(x, y, z);
+                            var b = new Vector3(x, y, z + size);
+                            var c = new Vector3(x + size, y, z + size);
+                            var d = new Vector3(x + size, y, z);
+                            var top = new Vector3(x + size / 2, y + 1, z + size / 2);
+
+                            shape = new Triangle(a, b, c, d, top, material);
+                        }
+                        else
+                        {
+                            shape = new Sphere(position, size/2, material);
+                        }
+
+                        entities.Add(shape);
                     }
                 }
             }
 
-            return new World(spheres, new List<PointLight>());
+
+            return new World(entities, new List<PointLight>());
         }
 
         private World TestScene()
@@ -210,8 +251,7 @@ namespace Raytracer
             // TODO: Add your drawing code here
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
             this.Render();
-            var cube = new Cube(Color.Red, GraphicsDevice, _camera);
-            cube.Render();
+
 
             _spriteBatch.End();
 

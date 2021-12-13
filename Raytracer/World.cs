@@ -22,35 +22,16 @@ namespace Raytracer
             _objects = objects;
             PointLights = pointLights;
             OctTree = new OctTree(objects, Bounds);
-          
-            PrintQuadTree(OctTree,0);
+            
+            OctTree.UpdateTree();
+
+            //OctTree.PrintQuadTree(OctTree, 0);
         }
 
-        void PrintQuadTree(OctTree tree, int quad)
-        {
-            if (tree == null)
-            {
-                return;
-            }
-            Debug.WriteLine("");
+       
+        public CubeBound Bounds => new CubeBound(-30, -30, -30, 60, 60, 60);
 
-            for (int i = 0; i < tree._level; i++)
-            {
-                Debug.Write("\t");
-            }
-            Debug.Write(String.Format("[ {0} Level {1}; Objects: {2} min: {3} max: {4}", quad, tree._level, tree._objects.Count, tree._bounds.Min, tree._bounds.Max));
-
-            for (int i = 0; i < tree._nodes.Length; i++)
-            {
-                PrintQuadTree(tree._nodes[i], i);
-            }
-
-            Debug.Write(String.Format(" ]"));
-        }
-
-        public CubeBound Bounds => new CubeBound(0, 0, 0, 10, 10, 10);
-
-        public bool Intersects(CustomRay ray, float tmin, float tmax, ref HitRecord record)
+        public bool Intersects(Ray ray, float tmin, float tmax, ref HitRecord record)
         {
             // bool intersects = false;
             //
@@ -71,9 +52,25 @@ namespace Raytracer
             //
             // return intersects;
 
-
-            record.T = float.MaxValue;
-            return OctTree.Intersects(new Ray(ray.O, ray.D), ref record);
+            var hits = OctTree.Intersects(new Ray(ray.Position, ray.Direction));
+            
+            var lowestT = float.MaxValue;
+            var lowestRecord = new HitRecord();
+            var intersected = false;
+            
+            foreach (var hit in hits)
+            {
+                if (hit.T < lowestT)
+                {
+                    lowestT = hit.T;
+                    intersected = true;
+                    lowestRecord = hit;
+                }
+            }
+            
+            record = lowestRecord;
+            
+            return intersected;
         }
 
         // public bool HitsLight(CustomRay ray, Vector3 origin)

@@ -35,42 +35,9 @@ namespace Raytracer.Raytracer
         public float Aspect { get; }
         public Vector3 LowerLeft { get; }
 
-        public CustomRay GetRay(float u, float v)
+        public Ray GetRay(float u, float v)
         {
-            return new CustomRay(Origin, LowerLeft + u*Horizontal+ v*Vertical - Origin);
+            return new Ray(Origin, LowerLeft + u*Horizontal+ v*Vertical - Origin);
         }
-
-        // public int R(int width, int height)
-        // {
-        //     return width / height;
-        // }
-        //
-        // public Vector3 RasterSpace(int width, int height)
-        // {
-        //     var r = R(width, height);
-        //
-        // }
-        //
-        // public Point NormalisedCoord(Point p)
-        // {
-        //     var r = R(Game1.Width, Game1.Height);
-        //
-        //     var nx = (p.X / Game1.Width) * r;
-        //     var ny = (p.Y / Game1.Height) * r;
-        //
-        //     return new Point(nx, ny);
-        // }
-        //
-        //
-        // public Point ScreenSpaceCoord(Point p)
-        // {
-        //     var normalized = NormalisedCoord(p);
-        //     var r = R(Game1.Width, Game1.Height);
-        //
-        //     var sx = (2* normalized.X) - r;
-        //     var sy = -(2*p.Y - 1);
-        //
-        //     return new Point(nx, ny);
-        // }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Numerics;
+using Microsoft.Xna.Framework;
 using Raytracer.Raytracer;
 using Raytracer.Source.Shapes;
 using Vector3 = Microsoft.Xna.Framework.Vector3;
@@ -8,7 +9,7 @@ namespace Raytracer
 {
     public interface IMaterial
     {
-        public bool Scatter(CustomRay rayIn, HitRecord hitRecords, ref Vector3 attenuation, ref CustomRay scattered);
+        public bool Scatter(Ray rayIn, HitRecord hitRecords, ref Vector3 attenuation, ref Ray scattered);
 
         public Vector3 Reflect(Vector3 v, Vector3 n)
         {

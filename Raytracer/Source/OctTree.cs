@@ -32,6 +32,7 @@ namespace Raytracer.Source
         public float Height { get; set; }
         public float Depth { get; set; }
 
+        public Vector3 Dimensions => Max - Min;
     }
 
     public class OctTree
@@ -41,6 +42,10 @@ namespace Raytracer.Source
 
         private readonly OctTree[] _nodes;
         private readonly List<IRaytracable> _objects;
+        
+        private readonly Queue<IRaytracable> _pendingInsertions;
+        private bool _isTreeBuild;
+        private bool _isTreeReady;
 
         public const int MaxObjects = 10;
         public const int MaxLevels = 3;
@@ -50,6 +55,7 @@ namespace Raytracer.Source
         public bool Debug;
         public int DepthDebug;
         public Vector3 DebugColor;
+
 
         public OctTree(List<IRaytracable> objects, CubeBound bounds) : this(objects, 0, bounds)
         { }
@@ -63,52 +69,57 @@ namespace Raytracer.Source
             _level = level;
             _bounds = bounds;
             _nodes = new OctTree[8];
-            _objects = objects;
+            _objects = new List<IRaytracable>();
 
             var rand = new Random();
             DebugColor = new Vector3((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
             Debug = true;
-            DepthDebug = 3;
+            DepthDebug = 4;
+            _pendingInsertions = new Queue<IRaytracable>(objects);
+            _isTreeBuild = false;
+            _isTreeReady = false;
         }
 
-        public void Split()
+        public CubeBound[] CalculateOctBounds()
         {
             float halfWidth = _bounds.Width / 2f;
             float halfHeight = _bounds.Height / 2f;
             float halfDepth = _bounds.Depth / 2f;
 
             if (halfWidth < MinimalCubeSize.X || halfHeight < MinimalCubeSize.Y || halfDepth < MinimalCubeSize.Z)
-                return;
+                return new CubeBound[]{};
 
             float x = _bounds.X;
             float y = _bounds.Y;
             float z = _bounds.Z;
-
-            int nextLevel = _level + 1;
+            
+            var octant = new CubeBound[8];
 
             // bottom
             // 1
-            _nodes[0] = new OctTree(nextLevel, new CubeBound(x, y, z, halfWidth, halfHeight, halfDepth));
+            octant[0] = new CubeBound(x, y, z, halfWidth, halfHeight, halfDepth);
             // 2
-            _nodes[1] = new OctTree(nextLevel, new CubeBound(x + halfWidth, y, z, halfWidth, halfHeight, halfDepth));
+            octant[1] = new CubeBound(x + halfWidth, y, z, halfWidth, halfHeight, halfDepth);
             // 3
-            _nodes[2] = new OctTree(nextLevel, new CubeBound(x, y, z + halfDepth, halfWidth, halfHeight, halfDepth));
+            octant[2] = new CubeBound(x, y, z + halfDepth, halfWidth, halfHeight, halfDepth);
             // 4
-            _nodes[3] = new OctTree(nextLevel, new CubeBound(x+halfWidth, y, z + halfDepth, halfWidth, halfHeight, halfDepth));
+            octant[3] = new CubeBound(x+halfWidth, y, z + halfDepth, halfWidth, halfHeight, halfDepth);
 
 
             // top
             // 5
-            _nodes[4] = new OctTree(nextLevel, new CubeBound(x, y+halfHeight, z, halfWidth, halfHeight, halfDepth));
+            octant[4] = new CubeBound(x, y+halfHeight, z, halfWidth, halfHeight, halfDepth);
             // 6
-            _nodes[5] = new OctTree(nextLevel, new CubeBound(x + halfWidth, y + halfHeight, z, halfWidth, halfHeight, halfDepth));
+            octant[5] = new CubeBound(x + halfWidth, y + halfHeight, z, halfWidth, halfHeight, halfDepth);
             // 7
-            _nodes[6] = new OctTree(nextLevel, new CubeBound(x, y + halfHeight, z + halfDepth, halfWidth, halfHeight, halfDepth));
+            octant[6] = new CubeBound(x, y + halfHeight, z + halfDepth, halfWidth, halfHeight, halfDepth);
             // 8
-            _nodes[7] = new OctTree(nextLevel, new CubeBound(x + halfWidth, y + halfHeight, z + halfDepth, halfWidth, halfHeight, halfDepth));
+            octant[7] = new CubeBound(x + halfWidth, y + halfHeight, z + halfDepth, halfWidth, halfHeight, halfDepth);
+
+            return octant;
         }
 
-        public int _getIndex(CubeBound obj)
+        private int _getIndex(CubeBound obj)
         {
             int index = -1;
 
@@ -116,8 +127,8 @@ namespace Raytracer.Source
             double horizontalMidpoint = _bounds.Y + (_bounds.Height / 2);
             double depthMidpoint = _bounds.Z + (_bounds.Depth / 2);
 
-            bool topQuadrant = (obj.Y < horizontalMidpoint && obj.Y + obj.Height < horizontalMidpoint);
-            bool bottomQuadrant = (obj.Y > horizontalMidpoint);
+            bool bottomQuadrant = (obj.Y < horizontalMidpoint && obj.Y + obj.Height < horizontalMidpoint);
+            bool topQuadrant = (obj.Y > horizontalMidpoint);
 
             bool leftQuadrant = obj.X < verticalMidpoint && obj.X + obj.Width < verticalMidpoint;
             bool rightQuadrant = obj.X > verticalMidpoint;
@@ -184,160 +195,240 @@ namespace Raytracer.Source
 
             return index;
         }
-        
 
 
-        public void Insert(IRaytracable rect)
+
+        public void LazyInsert(IRaytracable obj)
         {
-            if (!IsLeaveNode())
-            {
-                int index = _getIndex(rect.Bounds);
-
-                if (index != -1)
-                {
-                    _nodes[index].Insert(rect);
-                    return;
-                }
-            }
-
-            _objects.Add(rect);
-
-            if (_objects.Count > MaxObjects && _level < MaxLevels)
-            {
-                if (IsLeaveNode())
-                {
-                    Split();
-                }
-
-                int i = 0;
-                while (i < _objects.Count)
-                {
-                    int index = _getIndex(_objects[i].Bounds);
-
-                    if (index != -1)
-                    {
-                        var obj = _objects[i];
-                        _objects.RemoveAt(i);
-                        _nodes[index].Insert(obj);
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
-            }
+            _pendingInsertions.Enqueue(obj);
         }
 
-        public List<IRaytracable> Retrieve(List<IRaytracable> returnObjects, CubeBound rect)
+        public void UpdateTree()
         {
-            int index = _getIndex(rect);
-            
-            if (index != -1 && _nodes[0] != null)
+            if (!_isTreeBuild)
             {
-                _nodes[index].Retrieve(returnObjects, rect);
-            }
-
-            returnObjects.AddRange(_objects);
-            return returnObjects;
-        }
-
-        public bool DebugIntersects(Ray ray, ref HitRecord record)
-        {
-            var box = new BoundingBox(_bounds.Min, _bounds.Max);
-            var t = box.Intersects(ray);
-
-            if (t == null)
-                return false;
-
-            if (DepthDebug == _level)
-            {
-                if (t.Value < record.T)
+                while (_pendingInsertions.TryDequeue(out var obj))
                 {
-                    record.T = t.Value;
-
-                    record.Material = new Lambertian(DebugColor);
-                    record.P = new CustomRay(ray.Position, ray.Direction).PointAt(t.Value);
-                    record.Normal = Vector3.One;
-                    return true;
+                    _objects.Add(obj);
                 }
-            }
-
-            if (!IsLeaveNode())
-            {
-                bool intersects = _nodes[0].DebugIntersects(ray, ref record);
-                intersects |= _nodes[1].Intersects(ray, ref record);
-                intersects |= _nodes[2].DebugIntersects(ray, ref record);
-                intersects |= _nodes[3].DebugIntersects(ray, ref record);
-                intersects |= _nodes[4].DebugIntersects(ray, ref record);
-                intersects |= _nodes[5].DebugIntersects(ray, ref record);
-                intersects |= _nodes[6].DebugIntersects(ray, ref record);
-                intersects |= _nodes[7].DebugIntersects(ray, ref record);
-
-                return intersects;
-            }
-
-            return false;
-        }
-
-        public bool Intersects(Ray ray, ref HitRecord record)
-        {
-            var box = new BoundingBox(_bounds.Min, _bounds.Max);
-            var t = box.Intersects(ray);
-
-            if (t == null)
-                return false;
-
-            if (DepthDebug == _level)
-            {
-                if (t.Value < record.T)
-                {
-                    record.T = t.Value;
-
-                    record.Material = new Lambertian(DebugColor);
-                    record.P = new CustomRay(ray.Position, ray.Direction).PointAt(t.Value);
-                    record.Normal = Vector3.One;
-                    return true;
-                }
-            }
-
-            if (IsLeaveNode())
-            {
-                return _intersectsWithObjects(ray, ref record, _objects);
+                BuildTree();
             }
             else
             {
-                bool intersects = _intersectsWithObjects(ray, ref record, _objects);
-
-                intersects |= _nodes[0].Intersects(ray, ref record);
-                intersects |= _nodes[1].Intersects(ray, ref record);
-                intersects |= _nodes[2].Intersects(ray, ref record);
-                intersects |= _nodes[3].Intersects(ray, ref record);
-                intersects |= _nodes[4].Intersects(ray, ref record);
-                intersects |= _nodes[5].Intersects(ray, ref record);
-                intersects |= _nodes[6].Intersects(ray, ref record);
-                intersects |= _nodes[7].Intersects(ray, ref record);
-                return intersects;
-            }
-        }
-
-        private bool _intersectsWithObjects(Ray ray, ref HitRecord record, List<IRaytracable> objects)
-        {
-            bool intersects = false;
-            record.T = float.MaxValue;
-            HitRecord hitRecord = record;
-
-            foreach (var obj in _objects)
-            {
-                var intersected = obj.Intersects(new CustomRay(ray.Position, ray.Direction), 0f, 1000f, ref hitRecord);
-
-                if (intersected && hitRecord.T < record.T)
+                while (_pendingInsertions.TryDequeue(out var obj))
                 {
-                    record = hitRecord;
-                    intersects = true;
+                    //Insert(obj);
                 }
             }
 
-            return intersects;
+            _isTreeReady = true;
+        }
+
+        private void BuildTree()
+        {
+            if (!HasObjects)
+                return;
+            
+            if (!_isValidBounce(_bounds.Dimensions))
+            {
+                return;
+            }
+
+            var octant = CalculateOctBounds();
+
+            if (octant.Length == 0)
+                return;
+
+            List<IRaytracable>[] octantObjects = new List<IRaytracable>[8];
+            for (int i = 0; i < 8; i++)
+                octantObjects[i] = new List<IRaytracable>();
+
+            List<IRaytracable> delist = new List<IRaytracable>();
+
+            foreach (var obj in _objects)
+            {
+                var index = _getIndex(obj.Bounds);
+
+                if (index != -1)
+                {
+                    octantObjects[index-1].Add(obj);
+                    delist.Add(obj);
+                }
+            }
+
+            foreach (var obj in delist)
+                _objects.Remove(obj);
+
+            //Create child nodes where there are items contained in the bounding region
+            for (int a = 0; a < 8; a++)
+            {
+                _nodes[a] = new OctTree(octantObjects[a], _level + 1, octant[a]);
+                _nodes[a].UpdateTree();
+            }
+
+            _isTreeBuild = true;
+            _isTreeReady = true;
+        }
+
+        private bool _isValidBounce(Vector3 bounds)
+        {
+            if (bounds.X <= MinimalCubeSize.X && bounds.Y <= MinimalCubeSize.Y && bounds.Z <= MinimalCubeSize.Z)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool Insert(IRaytracable rect)
+        {
+            if (IsLeaveNode())
+            {
+                _objects.Add(rect);
+                return true;
+            }
+
+            if (!_isValidBounce(_bounds.Dimensions))
+            {
+                _objects.Add(rect);
+                return true;
+            }
+
+            var nodeIndex = _getIndex(rect.Bounds);
+
+            if (nodeIndex == -1)
+            {
+                _objects.Add(rect);
+                return true;
+            } if (nodeIndex >= 1)
+            {
+                return _nodes[nodeIndex - 1].Insert(rect);
+            }
+
+            throw new Exception("Could not insert item into the tree");
+        }
+        //
+        // public List<IRaytracable> Retrieve(List<IRaytracable> returnObjects, CubeBound rect)
+        // {
+        //     int index = _getIndex(rect);
+        //     
+        //     if (index != -1 && _nodes[0] != null)
+        //     {
+        //         _nodes[index].Retrieve(returnObjects, rect);
+        //     }
+        //
+        //     returnObjects.AddRange(_objects);
+        //     return returnObjects;
+        // }
+        //
+        // public bool DebugIntersects(Ray ray, ref HitRecord record)
+        // {
+        //     var box = new BoundingBox(_bounds.Min, _bounds.Max);
+        //     var t = box.Intersects(ray);
+        //
+        //     if (t == null)
+        //         return false;
+        //
+        //     if (DepthDebug == _level)
+        //     {
+        //         if (t.Value < record.T)
+        //         {
+        //             record.T = t.Value;
+        //
+        //             record.Material = new Lambertian(DebugColor);
+        //             record.P = new CustomRay(ray.Position, ray.Direction).PointAt(t.Value);
+        //             record.Normal = Vector3.One;
+        //             return true;
+        //         }
+        //     }
+        //
+        //     if (!IsLeaveNode())
+        //     {
+        //         bool intersects = _nodes[0].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[1].Intersects(ray, ref record);
+        //         intersects |= _nodes[2].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[3].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[4].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[5].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[6].DebugIntersects(ray, ref record);
+        //         intersects |= _nodes[7].DebugIntersects(ray, ref record);
+        //
+        //         return intersects;
+        //     }
+        //
+        //     return false;
+        // }
+
+        public bool[] FindIntersectingBounds(Ray ray, OctTree root)
+        {
+            var indexes = new bool[8];
+
+            for (int i = 0; i < 8; i++)
+            {
+                if (!root._nodes[i]._isTreeBuild || !root._nodes[i]._isTreeReady)
+                    indexes[i] = false;
+                else
+                {
+                    var box = new BoundingBox(root._nodes[i]._bounds.Min, root._nodes[i]._bounds.Max);
+                    var t = box.Intersects(ray);
+
+                    if (t != null && t != 0)
+                    {
+                        indexes[i] = true;
+                    }
+                }
+            }
+
+            return indexes;
+        }
+
+        public List<HitRecord> Intersects(Ray ray)
+        {
+            if (!_isTreeBuild)
+                return new List<HitRecord>();
+
+            if (IsLeaveNode() && !HasObjects)
+                return null;
+          
+       
+            var toCheck = FindIntersectingBounds(ray, this);
+            
+            var records  = _intersectsWithObjects(ray);
+            
+            for (int i = 0; i < 8; i++)
+            {
+                if (toCheck[i])
+                {
+                    var hitList = _nodes[i].Intersects(ray);
+
+                    if (hitList != null && hitList.Count > 0)
+                        records.AddRange(hitList);
+                }
+            }
+
+            return records;
+        }
+
+        public bool HasObjects => _objects.Count != 0;
+
+        public bool HasChilderen => _nodes.Any(x => x != null);
+
+        private List<HitRecord> _intersectsWithObjects(Ray ray)
+        {
+            var records = new List<HitRecord>();
+            
+            foreach (var obj in _objects)
+            {
+                var record = new HitRecord();
+                
+
+                if (obj.Intersects(ray, 0f, 1000f, ref record))
+                {
+                    records.Add(record);
+                }
+            }
+
+            return records;
         }
 
         public bool IsRoot()
@@ -348,6 +439,38 @@ namespace Raytracer.Source
         public bool IsLeaveNode()
         {
             return _nodes[0] == null;
+        }
+
+        public void PrintQuadTree(OctTree tree, int quad)
+        {
+            if (tree == null)
+            {
+                return;
+            }
+            System.Diagnostics.Debug.WriteLine("");
+
+            for (int i = 0; i < tree._level; i++)
+            {
+                System.Diagnostics.Debug.Write("\t");
+            }
+            System.Diagnostics.Debug.Write(String.Format("[ {0} Level {1}; Objects: {2} min: {3} max: {4}", quad, tree._level, tree._objects.Count, tree._bounds.Min, tree._bounds.Max));
+
+            for (int i = 0; i < tree._nodes.Length; i++)
+            {
+                PrintQuadTree(tree._nodes[i], i);
+            }
+
+            System.Diagnostics.Debug.Write(String.Format(" ]"));
+        }
+
+        public OctTree GetNode(int i)
+        {
+            return _nodes[i];
+        }
+
+        public IRaytracable GetObject(int i)
+        {
+            return _objects[i];
         }
     }
 }

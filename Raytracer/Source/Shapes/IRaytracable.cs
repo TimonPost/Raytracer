@@ -7,6 +7,6 @@ namespace Raytracer.Source.Shapes
         public CubeBound Bounds { get; }
 
 
-        bool Intersects(CustomRay ray, float tmin, float tmax, ref HitRecord record);
+        bool Intersects(Ray ray, float tmin, float tmax, ref HitRecord record);
     }
 }

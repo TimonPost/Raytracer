@@ -13,7 +13,7 @@ namespace Raytracer
             _size = size;
         }
 
-        public bool Scatter(CustomRay ray_in, HitRecord record, ref Vector3 attenuation, ref CustomRay scattered)
+        public bool Scatter(Ray ray_in, HitRecord record, ref Vector3 attenuation, ref Ray scattered)
         {
             float sines = MathF.Sin(_size * record.P.X) * MathF.Sin(_size * record.P.Y) * MathF.Sin(_size * record.P.Z);
 
@@ -23,7 +23,7 @@ namespace Raytracer
                 attenuation = new Vector3(1f, 1f, 1f);
 
             var target = record.P + record.Normal + Game1.RandomInUnitSphere();
-            scattered = new CustomRay(record.P, target - record.P);
+            scattered = new Ray(record.P, target - record.P);
             return true;
         }
     }

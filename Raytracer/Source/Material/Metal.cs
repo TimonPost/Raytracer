@@ -14,12 +14,12 @@ namespace Raytracer
             _fuzz = f;
         }
 
-        public bool Scatter(CustomRay ray_in, HitRecord record, ref Vector3 attenuation, ref CustomRay scattered)
+        public bool Scatter(Ray ray_in, HitRecord record, ref Vector3 attenuation, ref Ray scattered)
         {
-            var reflected = ((IMaterial)(this)).Reflect(Vector3.Normalize(ray_in.Direction()), record.Normal);
-            scattered = new CustomRay(record.P, reflected+_fuzz*Game1.RandomInUnitSphere());
+            var reflected = ((IMaterial)(this)).Reflect(Vector3.Normalize(ray_in.Direction), record.Normal);
+            scattered = new Ray(record.P, reflected+_fuzz*Game1.RandomInUnitSphere());
             attenuation = _albedo;
-            return Vector3.Dot(scattered.Direction(), record.Normal) > 0;
+            return Vector3.Dot(scattered.Direction, record.Normal) > 0;
         }
     }
 }
