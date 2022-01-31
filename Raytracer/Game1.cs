@@ -47,15 +47,15 @@ namespace Raytracer
             
             _canvas = new Texture2D(_graphics.GraphicsDevice, (int) Width, (int) Height);
            
-            Vector3 lookFrom = new Vector3(15f, 15f, 35f);
-            Vector3 lookAt = new Vector3(15f, 15f,15f);
+            Vector3 lookFrom = new Vector3(6f, 2f, 1.5f);
+            Vector3 lookAt = new Vector3(0f,0f,0f);
             float aspectRatio = Width / Height;
             float fov =90f;
             
             _camera = new Camera(lookFrom, lookAt, new Vector3(0f,1f,0f), fov, aspectRatio);
             _rayTracer = new RayTracer(_camera, Width, Height, 16);
 
-            _world = CubeScene();
+            _world = SphereScene();
 
             base.Initialize();
         }
@@ -66,10 +66,10 @@ namespace Raytracer
             entities.Add(new Sphere(new Vector3(0f, -1000, 0f), 1000f, new Lambertian(new Vector3(212/255f, 135/255f, 205/255f))));
             var rand = new Random();
 
-            int count = 30;
-            int zoffset = 0;
-            int yoffsetr = 0;
-            float size = 1.5f;
+            int count = 10;
+            int zoffset = 10;
+            int yoffsetr = 10;
+            float size = 2.5f;
 
             for (int y = 0 + yoffsetr; y < count + yoffsetr; y += 3)
             {
@@ -213,7 +213,10 @@ namespace Raytracer
              entities.Add(
                  new Sphere(new Vector3(4f, 1f, 0f), 1.0f, new Metal(new Vector3(0.7f, 0.6f, 0.5f), 0f)));
 
-             return new World(entities.Cast<IRaytracable>().ToList(), new List<PointLight>());
+             return new World(entities.Cast<IRaytracable>().ToList(), new List<PointLight>()
+             {
+                 new PointLight(new Vector3(3f, 3f, 0f), new Vector3(0f, -1f, 0f), new Vector3(1f, 1f, 1f))
+             });
         }
 
         protected override void LoadContent()

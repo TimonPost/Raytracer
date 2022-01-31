@@ -25,39 +25,33 @@ namespace Raytracer
             
             OctTree.UpdateTree();
 
-            //OctTree.PrintQuadTree(OctTree, 0);
+            OctTree.PrintQuadTree(OctTree, 0);
         }
 
        
-        public CubeBound Bounds => new CubeBound(-30, -30, -30, 60, 60, 60);
+        public CubeBound Bounds => new CubeBound(-15, -15, -15, 30, 30, 30);
 
         public bool Intersects(Ray ray, float tmin, float tmax, ref HitRecord record)
         {
-            // bool intersects = false;
-            //
-            // record.T = float.MaxValue;
-            // HitRecord hitRecord = record;
-            //
-            // foreach (var plane in _objects)
-            // {
-            //     if (plane.Intersects(ray, tmin, tmax, ref hitRecord))
-            //     {
-            //         if (hitRecord.T < record.T)
-            //         {
-            //             intersects = true;
-            //             record = hitRecord;
-            //         }
-            //     }
-            // }
-            //
-            // return intersects;
+            var (intersected, hitRecord) = OctTree.Intersects(new Ray(ray.Position, ray.Direction));
+            
+            if (hitRecord.HasValue)
+                record = hitRecord.Value;
+            
+            return intersected;
+        }
 
-            var hits = OctTree.Intersects(new Ray(ray.Position, ray.Direction));
+        public bool IntersectedObjects(Ray ray, float tmin, float tmax, ref HitRecord record)
+        {
+            var hits = OctTree.IntersectedObjects(ray);
             
             var lowestT = float.MaxValue;
             var lowestRecord = new HitRecord();
             var intersected = false;
-            
+
+            if (hits == null)
+                return false;
+
             foreach (var hit in hits)
             {
                 if (hit.T < lowestT)
@@ -67,36 +61,25 @@ namespace Raytracer
                     lowestRecord = hit;
                 }
             }
-            
+
             record = lowestRecord;
-            
             return intersected;
         }
 
-        // public bool HitsLight(CustomRay ray, Vector3 origin)
-        // {
-        //     var record = new HitRecord();
-        //
-        //     foreach (var pointLight in PointLights)
-        //     {
-        //         var lightRay = new CustomRay(origin, pointLight.Position - origin);
-        //
-        //         var nearestObject = float.MaxValue;
-        //
-        //         if (Intersects(lightRay, 0f, 1000f, ref record))
-        //         {
-        //             nearestObject = record.T;
-        //         }
-        //
-        //         var intersection = new Sphere(pointLight.Position, 0.9f, null);
-        //         
-        //         if (intersection.Intersects(lightRay, 0f, 1000f, ref record))
-        //         {
-        //             return !(nearestObject < record.T);
-        //         }
-        //     }
-        //
-        //     return false;
-        // }
+        public bool HitsLight(Ray ray, Vector3 origin)
+        {
+            var record = new HitRecord();
+
+            var intersects = false;
+
+            foreach (var pointLight in PointLights)
+            {
+                var lightRay = new Ray(origin, pointLight.Position - origin);
+                
+                intersects = Intersects(lightRay, 0f, 1000f, ref record);
+            }
+        
+            return !intersects;
+        }
     }
 }

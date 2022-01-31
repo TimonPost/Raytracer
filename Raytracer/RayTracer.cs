@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended;
 using Raytracer.Raytracer;
 using Raytracer.Source.Shapes;
 
@@ -24,7 +25,7 @@ namespace Raytracer
         public int Width { get; }
         public int Height { get; }
        
-        public int PixelSampleCount = 120;
+        public int PixelSampleCount;
         public int RayDepth = 5;
         public float MinIntersection = 0.001f;
         public float MaxIntersection = 1000;
@@ -44,6 +45,8 @@ namespace Raytracer
             var rnd = new Random();
             _jobs = _jobs.Select(x => new { value = x, order = rnd.Next() })
                 .OrderBy(x => x.order).Select(x => x.value).ToList();
+
+            PixelSampleCount = SampleCountFromQuality(RenderQuality.Low);
         }
 
         private void QueueRenderWithQuality(RenderQuality quality)
@@ -137,20 +140,26 @@ namespace Raytracer
                         var urand = rand.NextDouble();
                         var vrand = rand.NextDouble();
 
-                        if (r == 280 && c == 191)
-                        {
-
-                        }
-
                         float u = (float)(c + urand) / (Width);
                         float v = (float)(r + vrand) / (Height);
 
                         var ray = _camera.GetRay(u, v);
-                        color += Trace(world, ray, 0);
+                        var (intersected, pixelColor) = Trace(world, ray, 0);
+
+                        color += pixelColor;
+
+                        // if (!intersected)
+                        // {
+                        //     color *= PixelSampleCount;
+                        //
+                        //
+                        //     break;
+                        // }
                     }
 
                     color /= PixelSampleCount;
-                    color = new Vector3(MathF.Sqrt(color.X), MathF.Sqrt(color.Y), MathF.Sqrt(color.Z));
+                    var a = 1;
+                    color = new Vector3(MathF.Sqrt(color.X*a), MathF.Sqrt(color.Y*a), MathF.Sqrt(color.Z*a));
                     
                      FrameBuffer.SetPixel((int)c, (int)r, new Color(color));
                     
@@ -158,7 +167,7 @@ namespace Raytracer
             }
         }
 
-        private Vector3 Trace(World world, Ray ray, int depth)
+        private (bool, Vector3) Trace(World world, Ray ray, int depth)
         {
             var record = new HitRecord();
 
@@ -170,29 +179,26 @@ namespace Raytracer
                 
                 if (depth < RayDepth && record.Material.Scatter(ray, record, ref attenuation, ref scattered))
                 {
-                    var att = attenuation * Trace(world, scattered, depth + 1);
+                    var att = attenuation * Trace(world, scattered, depth + 1).Item2;
 
-                    // if (!world.HitsLight(ray, record.P))
-                    // {
-                    //     att *= 0.2f;
-                    // } 
+                    if (!world.HitsLight(ray, record.P))
+                    {
+                        att *= 0.2f;
+                    } 
                     
-                    return att;
+                    return (true,att);
                 }
                 else
                 {
-                    return new Vector3(0.0f, 0.0f, 0.0f);
+                    return (true,new Vector3(0.0f, 0.0f, 0.0f));
                 }
-
-
-                return attenuation;
             }
 
             
             var direction = Vector3.Normalize(ray.Direction);
             var t = 0.5f * (direction.Y + 1.0f);
             var blend = (1.0f - t) * new Vector3(1f, 1f, 1f) + t * new Vector3(0.5f, 0.7f, 1f);
-            return blend;
+            return (false, blend);
         }
 
 

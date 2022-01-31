@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Threading;
 using Microsoft.Xna.Framework;
 using Raytracer.Source.Shapes;
 using Vector3 = Microsoft.Xna.Framework.Vector3;
@@ -19,10 +21,14 @@ namespace Raytracer.Source
             Width = width;
             Height = height;
             Depth = depth;
+            Min = new Vector3(X, Y, Z);
+            Max = Min + new Vector3(Width, Height, Depth);
+            Bounds = new BoundingBox(Min, Max);
         }
 
-        public Vector3 Min => new Vector3(X, Y, Z);
-        public Vector3 Max => Min + new Vector3(Width, Height, Depth);
+        public BoundingBox Bounds { get; }
+        public Vector3 Min { get; }
+        public Vector3 Max { get; } 
 
         public float X { get; set; }
         public float Y { get; set; }
@@ -128,13 +134,13 @@ namespace Raytracer.Source
             double depthMidpoint = _bounds.Z + (_bounds.Depth / 2);
 
             bool bottomQuadrant = (obj.Y < horizontalMidpoint && obj.Y + obj.Height < horizontalMidpoint);
-            bool topQuadrant = (obj.Y > horizontalMidpoint);
+            bool topQuadrant = (obj.Y >= horizontalMidpoint);
 
             bool leftQuadrant = obj.X < verticalMidpoint && obj.X + obj.Width < verticalMidpoint;
-            bool rightQuadrant = obj.X > verticalMidpoint;
+            bool rightQuadrant = obj.X >= verticalMidpoint;
 
             bool frontQuadrant = obj.Z < depthMidpoint && obj.Z + obj.Depth < depthMidpoint;
-            bool backQuadrant = obj.Z > depthMidpoint;
+            bool backQuadrant = obj.Z >= depthMidpoint;
 
             if (leftQuadrant)
             {
@@ -369,8 +375,7 @@ namespace Raytracer.Source
                     indexes[i] = false;
                 else
                 {
-                    var box = new BoundingBox(root._nodes[i]._bounds.Min, root._nodes[i]._bounds.Max);
-                    var t = box.Intersects(ray);
+                    var t = root._nodes[i]._bounds.Bounds.Intersects(ray);
 
                     if (t != null && t != 0)
                     {
@@ -382,38 +387,99 @@ namespace Raytracer.Source
             return indexes;
         }
 
-        public List<HitRecord> Intersects(Ray ray)
+        public (bool, HitRecord?) Intersects(Ray ray)
+        {
+            if (!_isTreeBuild)
+                return (false, null);
+
+            if (IsLeaveNode() && !HasObjects)
+                return (false, null);
+
+            var t = _bounds.Bounds.Intersects(ray);
+
+            if (t == null)
+            {
+                return (false, null);
+            }
+            
+            var (intersected, record) = NearestIntersection(ray);
+
+            if (!record.HasValue)
+            {
+                var r = new HitRecord();
+                r.T = float.MaxValue;
+                record = r;
+            }
+
+            for (int i = 0; i < 8; i++)
+            {
+                var (nodeIntersected, nodeRecord) = _nodes[i].Intersects(ray);
+
+                if (nodeIntersected && nodeRecord.HasValue && nodeRecord.Value.T < record.Value.T)
+                {
+                    record = nodeRecord;
+                    intersected = true;
+                }
+            }
+
+            return (intersected, record);
+        }
+
+        public List<HitRecord> IntersectedObjects(Ray ray)
         {
             if (!_isTreeBuild)
                 return new List<HitRecord>();
 
             if (IsLeaveNode() && !HasObjects)
                 return null;
-          
-       
-            var toCheck = FindIntersectingBounds(ray, this);
+
+            var t = _bounds.Bounds.Intersects(ray);
+
+            if (t == null)
+            {
+                return null;
+            }
             
-            var records  = _intersectsWithObjects(ray);
+            var records  = IntersectingObjects(ray);
             
             for (int i = 0; i < 8; i++)
             {
-                if (toCheck[i])
-                {
-                    var hitList = _nodes[i].Intersects(ray);
+                var hitList = _nodes[i].IntersectedObjects(ray);
 
-                    if (hitList != null && hitList.Count > 0)
-                        records.AddRange(hitList);
-                }
+                if (hitList != null && hitList.Count > 0)
+                    records.AddRange(hitList);
             }
-
+            
             return records;
         }
 
         public bool HasObjects => _objects.Count != 0;
 
-        public bool HasChilderen => _nodes.Any(x => x != null);
+        private (bool,HitRecord?) NearestIntersection(Ray ray)
+        {
+            var lowestRecord = new HitRecord();
+            lowestRecord.T = float.MaxValue;
 
-        private List<HitRecord> _intersectsWithObjects(Ray ray)
+            var intersected = false;
+
+            foreach (var obj in _objects)
+            {
+                var record = new HitRecord();
+
+                if (obj.Intersects(ray, 0f, 1000f, ref record))
+                {
+                    if (record.T < lowestRecord.T)
+                    {
+                        intersected = true;
+                        lowestRecord = record;
+                    }
+                }
+            }
+
+            return (intersected, lowestRecord);
+        }
+
+        private List<HitRecord> IntersectingObjects(Ray ray)
         {
             var records = new List<HitRecord>();
             
@@ -421,7 +487,6 @@ namespace Raytracer.Source
             {
                 var record = new HitRecord();
                 
-
                 if (obj.Intersects(ray, 0f, 1000f, ref record))
                 {
                     records.Add(record);
